@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ParkEase</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- LOGIN -->
+    <div id="login-screen" class="login-screen">
+        <div class="login-card">
+            <div class="logo-mark" style="margin-bottom:28px;">⬡ ParkEase</div>
+            <div class="login-title">Sign in</div>
+            <div class="login-sub">Enter your credentials to continue</div>
+            <div id="login-alert" class="alert alert-err"></div>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="login-user" placeholder="username" />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="login-pass" placeholder="••••••••" />
+            </div>
+            <div class="form-group" style="margin-top:4px;">
+                <label>Role hint (for UI)</label>
+                <select id="login-role">
+                    <option value="USER">User</option>
+                    <option value="OWNER">Owner</option>
+                    <option value="ADMIN">Admin</option>
+                </select>
+            </div>
+            <button class="btn btn-primary btn-full" style="margin-top:8px;" onclick="doLogin()">Sign in</button>
+            <div style="margin-top:16px; text-align:center;">
+                <span style="font-size:12px;color:var(--hint);">No account? </span>
+                <button class="btn btn-sm" onclick="showRegister()"
+                    style="font-size:12px; padding:3px 8px;">Register</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- REGISTER MODAL -->
+    <div id="modal-register" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Create account</span>
+                <button class="btn btn-sm" onclick="closeModal('modal-register')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="reg-alert" class="alert alert-err"></div>
+                <div class="form-group"><label>Username</label><input id="reg-user" type="text" /></div>
+                <div class="form-group"><label>Password</label><input id="reg-pass" type="password" /></div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="reg-role">
+                        <option value="USER">User</option>
+                        <option value="OWNER">Owner</option>
+                        <option value="ADMIN">Admin</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('modal-register')">Cancel</button>
+                <button class="btn btn-primary" onclick="doRegister()">Register</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app-screen" class="shell" style="display:none;">
+        <div class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-mark">⬡ ParkEase</div>
+                <div class="logo-sub">Management Console</div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">General</div>
+                <button class="nav-item active" onclick="goto('dashboard')" id="nav-dashboard">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="1" y="1" width="6" height="6" rx="1" />
+                        <rect x="9" y="1" width="6" height="6" rx="1" />
+                        <rect x="1" y="9" width="6" height="6" rx="1" />
+                        <rect x="9" y="9" width="6" height="6" rx="1" />
+                    </svg>
+                    Dashboard
+                </button>
+                <button class="nav-item" onclick="goto('lots')" id="nav-lots">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="1" y="4" width="14" height="10" rx="1" />
+                        <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1" />
+                        <path d="M1 8h14" />
+                    </svg>
+                    Parking Lots
+                </button>
+                <button class="nav-item" onclick="goto('slots')" id="nav-slots">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="1" y="1" width="14" height="14" rx="1" />
+                        <path d="M5 5h3.5a1.5 1.5 0 010 3H5V5z" />
+                    </svg>
+                    Slots
+                </button>
+                <div class="nav-section-label" style="margin-top:8px;">User</div>
+                <button class="nav-item" onclick="goto('bookings')" id="nav-bookings">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="2" y="2" width="12" height="12" rx="1" />
+                        <path d="M5 2V0M11 2V0M2 6h12" />
+                    </svg>
+                    My Bookings
+                </button>
+                <div id="admin-nav-section" style="display:none;">
+                    <div class="nav-section-label" style="margin-top:8px;">Admin</div>
+                    <button class="nav-item" onclick="goto('admin-users')" id="nav-admin-users">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="8" cy="5" r="3" />
+                            <path d="M1 14c0-3.314 3.134-6 7-6s7 2.686 7 6" />
+                        </svg>
+                        Users
+                    </button>
+                    <button class="nav-item" onclick="goto('admin-lots')" id="nav-admin-lots">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M1 12L5 4l3 5 2-3 4 6H1z" />
+                        </svg>
+                        All Lots
+                    </button>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-chip">
+                    <div class="user-avatar" id="sidebar-avatar"></div>
+                    <div>
+                        <div class="user-name" id="sidebar-name"></div>
+                        <div class="user-role" id="sidebar-role"></div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-danger" style="width:100%;margin-top:10px;justify-content:center;"
+                    onclick="doLogout()">Sign out</button>
+            </div>
+        </div>
+
+        <main class="main">
+            <!-- DASHBOARD -->
+            <div id="page-dashboard" class="page">
+                <div class="page-header">
+                    <div class="page-title">Dashboard</div>
+                    <div class="page-sub">Overview of your parking system</div>
+                </div>
+                <div class="auth-bar">
+                    <div class="auth-indicator on" id="conn-dot"></div>
+                    <span id="conn-text">Connected to <strong>parkease-production-web.up.railway.app</strong></span>
+                </div>
+                <div class="stats-row" id="dash-stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Lots</div>
+                        <div class="stat-val" id="dash-lots">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Slots</div>
+                        <div class="stat-val" id="dash-slots">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">My Bookings</div>
+                        <div class="stat-val" id="dash-bookings">—</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Recent bookings</div>
+                    </div>
+                    <div id="dash-booking-list">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARKING LOTS -->
+            <div id="page-lots" class="page" style="display:none;">
+                <div class="page-header flex-between">
+                    <div>
+                        <div class="page-title">Parking Lots</div>
+                        <div class="page-sub">Browse and manage lots</div>
+                    </div>
+                    <button class="btn btn-primary" onclick="openModal('modal-lot')">+ New lot</button>
+                </div>
+                <div class="card">
+                    <div id="lots-table-wrap">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SLOTS -->
+            <div id="page-slots" class="page" style="display:none;">
+                <div class="page-header flex-between">
+                    <div>
+                        <div class="page-title">Parking Slots</div>
+                        <div class="page-sub">All slots in the system</div>
+                    </div>
+                    <button class="btn btn-primary" onclick="openModal('modal-slot')">+ New slot</button>
+                </div>
+                <div class="card">
+                    <div id="slots-table-wrap">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOOKINGS -->
+            <div id="page-bookings" class="page" style="display:none;">
+                <div class="page-header flex-between">
+                    <div>
+                        <div class="page-title">My Bookings</div>
+                        <div class="page-sub">Your active and completed bookings</div>
+                    </div>
+                    <button class="btn btn-primary" onclick="openModal('modal-booking')">+ Book a slot</button>
+                </div>
+                <div class="card">
+                    <div id="bookings-table-wrap">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN: USERS -->
+            <div id="page-admin-users" class="page" style="display:none;">
+                <div class="page-header">
+                    <div class="page-title">Users</div>
+                    <div class="page-sub">All registered users</div>
+                </div>
+                <div class="card">
+                    <div id="admin-users-wrap">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN: ALL LOTS -->
+            <div id="page-admin-lots" class="page" style="display:none;">
+                <div class="page-header">
+                    <div class="page-title">All Parking Lots</div>
+                    <div class="page-sub">Admin view of every lot</div>
+                </div>
+                <div class="card">
+                    <div id="admin-lots-wrap">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- New Lot -->
+    <div id="modal-lot" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Create parking lot</span>
+                <button class="btn btn-sm" onclick="closeModal('modal-lot')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="lot-alert" class="alert alert-err"></div>
+                <div class="form-group"><label>Name</label><input id="lot-name" type="text" /></div>
+                <div class="form-group"><label>Location</label><input id="lot-location" type="text" /></div>
+                <div class="form-group"><label>Hourly rate (₹)</label><input id="lot-rate" type="number" min="0"
+                        step="0.5" /></div>
+                <div class="form-group"><label>Total slots</label><input id="lot-slots" type="number" min="1" /></div>
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="lot-active" checked style="width:auto;" /> Active
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('modal-lot')">Cancel</button>
+                <button class="btn btn-primary" onclick="createLot()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Slot -->
+    <div id="modal-slot" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Create parking slot</span>
+                <button class="btn btn-sm" onclick="closeModal('modal-slot')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="slot-alert" class="alert alert-err"></div>
+                <div class="form-group"><label>Slot number</label><input id="slot-number" type="number" min="1" /></div>
+                <div class="form-group">
+                    <label>Slot type</label>
+                    <select id="slot-type">
+                        <option value="STANDARD">Standard</option>
+                        <option value="COMPACT">Compact</option>
+                        <option value="LARGE">Large</option>
+                        <option value="HANDICAPPED">Handicapped</option>
+                        <option value="EV">EV</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="slot-avail" checked style="width:auto;" /> Available
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('modal-slot')">Cancel</button>
+                <button class="btn btn-primary" onclick="createSlot()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Booking -->
+    <div id="modal-booking" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Book a slot</span>
+                <button class="btn btn-sm" onclick="closeModal('modal-booking')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="booking-alert" class="alert alert-err"></div>
+                <div class="form-group">
+                    <label>Slot ID</label>
+                    <input id="booking-slot-id" type="number" min="1" placeholder="Enter slot ID" />
+                    <div style="font-size:11px;color:var(--hint);margin-top:4px;">Check the Slots page for available
+                        slot IDs</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('modal-booking')">Cancel</button>
+                <button class="btn btn-primary" onclick="createBooking()">Book</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
