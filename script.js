@@ -42,28 +42,38 @@ async function api(method, path, body) {
 async function doLogin() {
     const u = document.getElementById('login-user').value.trim();
     const p = document.getElementById('login-pass').value;
+    
     if (!u || !p) {
         showAlert('login-alert', 'Username and password required');
         return;
     }
+    
     try {
         const params = new URLSearchParams();
         params.append("username", u);
         params.append("password", p);
 
+        // Include CSRF token in the headers for Spring Security
+        const headers = {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        };
+        const token = getCsrfToken();
+        if (token) {
+            headers['X-XSRF-TOKEN'] = token;
+        }
+
         const response = await fetch(BASE + '/api/v1/auth/login', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'  // ← must be this
-            },
+            headers: headers,
             credentials: 'include',
-            body: params.toString()  // ← add .toString() explicitly
+            body: params.toString()
         });
 
         if (!response.ok) {
             const text = await response.text();
             throw new Error(text || response.statusText);
         }
+        
         SESSION.username = u;
         await fetchSessionInfo();
         startApp();
