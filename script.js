@@ -8,12 +8,22 @@ const ROLE_NAV = {
 	ADMIN: ['dashboard', 'slots', 'admin-users', 'admin-lots'],
 };
 
-function headers() {
-	return { 'Content-Type': 'application/json' };
+function getCsrfToken() {
+    const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+function headers(method) {
+    const h = { 'Content-Type': 'application/json' };
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method?.toUpperCase())) {
+        const token = getCsrfToken();
+        if (token) h['X-XSRF-TOKEN'] = token;
+    }
+    return h;
 }
 
 async function api(method, path, body) {
-	const opts = { method, headers: headers(), credentials: 'include' };
+	const opts = { method, headers: headers(method), credentials: 'include' };
 	if (body) opts.body = JSON.stringify(body);
 	const r = await fetch(BASE + path, opts);
 	if (r.status === 204) return null;
