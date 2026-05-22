@@ -38,8 +38,16 @@ async function api(method, path, body) {
 	return data;
 }
 
+async function initCsrf() {
+    await fetch(BASE + '/api/v1/health', {
+        credentials: 'include'
+    });
+}
+
 // Auth
 async function doLogin() {
+	await initCsrf();
+
     const u = document.getElementById('login-user').value.trim();
     const p = document.getElementById('login-pass').value;
     
@@ -87,6 +95,7 @@ async function doLogout() {
 		await fetch(BASE + '/api/v1/auth/logout', {
 			method: 'POST',
 			credentials: 'include',
+			headers: headers('POST')
 		});
 	} catch (e) {
 		// fall through and clear the local session state
