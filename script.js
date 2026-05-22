@@ -1,16 +1,19 @@
-const BASE = 'https://parkease-production-web.up.railway.app';
-let AUTH = null; // base64 encoded
-let SESSION = { username: '', role: '' };
+const BASE = 'https://parkease-production-web.up.railway.app'; // ->  PRODUCTION URL
+// const BASE = 'http://localhost:8080'; // -> LOCAL DEV URL
 
-function b64(u, p) {
-	return btoa(u + ':' + p);
-}
+let SESSION = { username: '', role: '' };
+const ROLE_NAV = {
+	USER: ['dashboard', 'lots', 'slots', 'bookings'],
+	OWNER: ['dashboard', 'lots', 'slots'],
+	ADMIN: ['dashboard', 'slots', 'admin-users', 'admin-lots'],
+};
+
 function headers() {
-	return { 'Content-Type': 'application/json', Authorization: 'Basic ' + AUTH };
+	return { 'Content-Type': 'application/json' };
 }
 
 async function api(method, path, body) {
-	const opts = { method, headers: headers() };
+	const opts = { method, headers: headers(), credentials: 'include' };
 	if (body) opts.body = JSON.stringify(body);
 	const r = await fetch(BASE + path, opts);
 	if (r.status === 204) return null;
@@ -27,29 +30,65 @@ async function api(method, path, body) {
 
 // Auth
 async function doLogin() {
-	const u = document.getElementById('login-user').value.trim();
-	const p = document.getElementById('login-pass').value;
-	const role = document.getElementById('login-role').value;
-	if (!u || !p) {
-		showAlert('login-alert', 'Username and password required');
-		return;
-	}
-	AUTH = b64(u, p);
-	SESSION = { username: u, role };
-	try {
-		await api('GET', '/api/v1/health');
-		startApp();
-	} catch (e) {
-		AUTH = null;
-		showAlert('login-alert', 'Login failed. Check credentials.');
-	}
+    const u = document.getElementById('login-user').value.trim();
+    const p = document.getElementById('login-pass').value;
+    if (!u || !p) {
+        showAlert('login-alert', 'Username and password required');
+        return;
+    }
+    try {
+        const params = new URLSearchParams();
+        params.append("username", u);
+        params.append("password", p);
+
+        const response = await fetch(BASE + '/api/v1/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'  // ← must be this
+            },
+            credentials: 'include',
+            body: params.toString()  // ← add .toString() explicitly
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || response.statusText);
+        }
+        SESSION.username = u;
+        await fetchSessionInfo();
+        startApp();
+    } catch (e) {
+        showAlert('login-alert', e.message || 'Login failed. Check credentials.');
+    }
 }
 
-function doLogout() {
-	AUTH = null;
-	SESSION = {};
+async function doLogout() {
+	try {
+		await fetch(BASE + '/api/v1/auth/logout', {
+			method: 'POST',
+			credentials: 'include',
+		});
+	} catch (e) {
+		// fall through and clear the local session state
+	}
+	SESSION = { username: '', role: '' };
 	document.getElementById('app-screen').style.display = 'none';
 	document.getElementById('login-screen').style.display = 'flex';
+}
+
+async function fetchSessionInfo() {
+	const data = await api('GET', '/api/v1/auth/me');
+	SESSION.username = data?.username || SESSION.username;
+	SESSION.role = data?.role || 'USER';
+}
+
+async function initApp() {
+	try {
+		await fetchSessionInfo();
+		startApp();
+	} catch (e) {
+		// Stay on the login screen when there is no active session.
+	}
 }
 
 function startApp() {
@@ -58,7 +97,8 @@ function startApp() {
 	document.getElementById('sidebar-name').textContent = SESSION.username;
 	document.getElementById('sidebar-role').textContent = SESSION.role;
 	document.getElementById('sidebar-avatar').textContent = SESSION.username.slice(0, 2).toUpperCase();
-	if (SESSION.role === 'ADMIN') document.getElementById('admin-nav-section').style.display = 'block';
+	updateDashboardIdentity();
+	syncSidebarForRole();
 	goto('dashboard');
 }
 
@@ -69,9 +109,9 @@ function showRegister() {
 async function doRegister() {
 	const u = document.getElementById('reg-user').value.trim();
 	const p = document.getElementById('reg-pass').value;
-	const r = document.getElementById('reg-role').value;
+	const role = document.getElementById('reg-role').value;
 	try {
-		await api('POST', '/api/v1/auth/register', { username: u, password: p, role: r });
+		await api('POST', '/api/v1/auth/register', { username: u, password: p, role });
 		closeModal('modal-register');
 		document.getElementById('login-user').value = u;
 		showAlert('login-alert', 'Registered! Sign in now.', true);
@@ -82,12 +122,44 @@ async function doRegister() {
 
 // Navigation
 function goto(page) {
+	const allowedPage = resolveAllowedPage(page);
+	if (allowedPage !== page) {
+		page = allowedPage;
+	}
+
 	document.querySelectorAll('.page').forEach((p) => (p.style.display = 'none'));
 	document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
 	document.getElementById('page-' + page).style.display = 'block';
-	const nav = document.getElementById('nav-' + page);
-	if (nav) nav.classList.add('active');
+	document.querySelectorAll('[data-nav-page="' + page + '"]').forEach((nav) => nav.classList.add('active'));
 	loadPage(page);
+}
+
+function syncSidebarForRole() {
+	document.querySelectorAll('[data-role-section]').forEach((section) => {
+		section.style.display = 'none';
+	});
+
+	const sectionId = roleSectionId(SESSION.role);
+	const activeSection = document.getElementById(sectionId);
+	if (activeSection) activeSection.style.display = 'block';
+}
+
+function roleSectionId(role) {
+	if (role === 'OWNER') return 'owner-nav-section';
+	if (role === 'ADMIN') return 'admin-nav-section';
+	return 'user-nav-section';
+}
+
+function updateDashboardIdentity() {
+	const el = document.getElementById('dashboard-account-heading');
+	if (!el) return;
+	el.textContent = `Logged in as ${SESSION.username} (${SESSION.role})`;
+}
+
+function resolveAllowedPage(page) {
+	const allowedPages = ROLE_NAV[SESSION.role] || ROLE_NAV.USER;
+	if (allowedPages.includes(page)) return page;
+	return allowedPages[0] || 'dashboard';
 }
 
 async function loadPage(page) {
@@ -102,17 +174,27 @@ async function loadPage(page) {
 // Dashboard
 async function loadDashboard() {
 	try {
-		const [lots, slots, bookings] = await Promise.allSettled([
+		const showMyBookings = SESSION.role === 'USER';
+		const bookingStatCard = document.getElementById('dash-bookings-card');
+		const recentBookingsCard = document.getElementById('dash-recent-bookings-card');
+		if (bookingStatCard) bookingStatCard.style.display = showMyBookings ? 'block' : 'none';
+		if (recentBookingsCard) recentBookingsCard.style.display = showMyBookings ? 'block' : 'none';
+
+		const [lots, slots] = await Promise.allSettled([
 			api('GET', '/api/v1/parking-lots'),
 			api('GET', '/api/v1/parking-slots'),
-			api('GET', '/api/v1/bookings/my'),
 		]);
 		document.getElementById('dash-lots').textContent = lots.status === 'fulfilled' ? lots.value.length : '—';
 		document.getElementById('dash-slots').textContent = slots.status === 'fulfilled' ? slots.value.length : '—';
-		document.getElementById('dash-bookings').textContent =
-			bookings.status === 'fulfilled' ? bookings.value.length : '—';
-		if (bookings.status === 'fulfilled') {
-			renderBookingTable(bookings.value.slice(0, 5), 'dash-booking-list', true);
+
+		if (showMyBookings) {
+			const bookings = await api('GET', '/api/v1/bookings/my');
+			document.getElementById('dash-bookings').textContent = bookings.length;
+			renderBookingTable(bookings.slice(0, 5), 'dash-booking-list', true);
+		} else {
+			document.getElementById('dash-bookings').textContent = '—';
+			const bookingList = document.getElementById('dash-booking-list');
+			if (bookingList) bookingList.innerHTML = '';
 		}
 	} catch (e) {}
 }
@@ -121,13 +203,15 @@ async function loadDashboard() {
 async function loadLots() {
 	const wrap = document.getElementById('lots-table-wrap');
 	try {
-		const data = await api('GET', '/api/v1/parking-lots');
+		const path = SESSION.role === 'OWNER' ? '/api/v1/parking-lots/my' : '/api/v1/parking-lots';
+		const canDeleteLots = SESSION.role === 'OWNER';
+		const data = await api('GET', path);
 		if (!data.length) {
 			wrap.innerHTML = '<div class="empty-state">No lots found</div>';
 			return;
 		}
 		wrap.innerHTML = `<table class="tbl">
-      <thead><tr><th>ID</th><th>Name</th><th>Location</th><th>Rate/hr</th><th>Slots</th><th>Owner</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>ID</th><th>Name</th><th>Location</th><th>Rate/hr</th><th>Slots</th><th>Owner</th><th>Status</th>${canDeleteLots ? '<th></th>' : ''}</tr></thead>
       <tbody>${data
 			.map(
 				(l) => `<tr>
@@ -138,9 +222,13 @@ async function loadLots() {
         <td>${l.totalSlots}</td>
         <td>${esc(l.ownerName || '—')}</td>
         <td><span class="badge ${l.active ? 'badge-success' : 'badge-neutral'}">${l.active ? 'Active' : 'Inactive'}</span></td>
-        <td><div class="row-actions">
-          <button class="btn btn-sm btn-danger" onclick="deleteLot(${l.id})">Delete</button>
-        </div></td>
+				${
+					canDeleteLots
+						? `<td><div class="row-actions">
+					<button class="btn btn-sm btn-danger" onclick="deleteLot(${l.id})">Delete</button>
+				</div></td>`
+						: ''
+				}
       </tr>`
 			)
 			.join('')}</tbody>
@@ -181,13 +269,14 @@ async function deleteLot(id) {
 async function loadSlots() {
 	const wrap = document.getElementById('slots-table-wrap');
 	try {
+		const canDeleteSlots = SESSION.role === 'OWNER';
 		const data = await api('GET', '/api/v1/parking-slots');
 		if (!data.length) {
 			wrap.innerHTML = '<div class="empty-state">No slots found</div>';
 			return;
 		}
 		wrap.innerHTML = `<table class="tbl">
-      <thead><tr><th>ID</th><th>Slot #</th><th>Type</th><th>Available</th><th></th></tr></thead>
+      <thead><tr><th>ID</th><th>Slot #</th><th>Type</th><th>Available</th>${canDeleteSlots ? '<th></th>' : ''}</tr></thead>
       <tbody>${data
 			.map(
 				(s) => `<tr>
@@ -195,9 +284,13 @@ async function loadSlots() {
         <td style="font-weight:500">${s.slotNumber}</td>
         <td>${esc(s.slotType)}</td>
         <td><span class="badge ${s.available ? 'badge-success' : 'badge-danger'}">${s.available ? 'Available' : 'Occupied'}</span></td>
-        <td><div class="row-actions">
+        ${
+					canDeleteSlots
+						? `<td><div class="row-actions">
           <button class="btn btn-sm btn-danger" onclick="deleteSlot(${s.id})">Delete</button>
-        </div></td>
+        </div></td>`
+						: ''
+				}
       </tr>`
 			)
 			.join('')}</tbody>
@@ -254,27 +347,27 @@ function renderBookingTable(data, containerId, compact) {
 		return;
 	}
 	el.innerHTML = `<table class="tbl">
-    <thead><tr><th>ID</th><th>Lot</th><th>Slot</th><th>Type</th><th>Status</th><th>Booked at</th>${!compact ? '<th></th>' : ''}</tr></thead>
-    <tbody>${data
+		<thead><tr><th>ID</th><th>Lot</th><th>Slot</th><th>Type</th><th>Status</th><th>Booked at</th>${!compact ? '<th></th>' : ''}</tr></thead>
+		<tbody>${data
 		.map(
 			(b) => `<tr>
-      <td class="mono">${b.id}</td>
-      <td style="font-weight:500">${esc(b.parkingLotName || '—')}</td>
-      <td>${b.slotNumber || b.slotId}</td>
-      <td style="color:var(--muted)">${esc(b.slotType || '—')}</td>
-      <td><span class="badge ${b.status === 'ACTIVE' ? 'badge-success' : 'badge-neutral'}">${b.status}</span></td>
-      <td style="color:var(--muted)">${b.bookedAt ? new Date(b.bookedAt).toLocaleString() : '—'}</td>
-      ${
+			<td class="mono">${b.id}</td>
+			<td style="font-weight:500">${esc(b.parkingLotName || '—')}</td>
+			<td>${b.slotNumber || b.slotId}</td>
+			<td style="color:var(--muted)">${esc(b.slotType || '—')}</td>
+			<td><span class="badge ${b.status === 'ACTIVE' ? 'badge-success' : 'badge-neutral'}">${b.status}</span></td>
+			<td style="color:var(--muted)">${b.bookedAt ? new Date(b.bookedAt).toLocaleString() : '—'}</td>
+			${
 			!compact
 				? `<td><div class="row-actions">
-        ${b.status === 'ACTIVE' ? `<button class="btn btn-sm" onclick="completeBooking(${b.id})">Complete</button>` : ''}
-      </div></td>`
+				${b.status === 'ACTIVE' ? `<button class="btn btn-sm" onclick="completeBooking(${b.id})">Complete</button>` : ''}
+			</div></td>`
 				: ''
 		}
-    </tr>`
+		</tr>`
 		)
 		.join('')}</tbody>
-  </table>`;
+	</table>`;
 }
 
 async function createBooking() {
@@ -394,3 +487,6 @@ document.querySelectorAll('.modal-overlay').forEach((o) => {
 document.addEventListener('keydown', (e) => {
 	if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
 });
+
+// Restore session on page load
+document.addEventListener('DOMContentLoaded', initApp);

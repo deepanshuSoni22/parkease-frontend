@@ -308,6 +308,13 @@ select {
 	margin-top: 3px;
 }
 
+.dashboard-account {
+	margin-top: 8px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text);
+}
+
 /* Cards */
 .card {
 	background: var(--surface);

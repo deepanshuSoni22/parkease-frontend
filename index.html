@@ -29,14 +29,7 @@
                 <label>Password</label>
                 <input type="password" id="login-pass" placeholder="••••••••" />
             </div>
-            <div class="form-group" style="margin-top:4px;">
-                <label>Role hint (for UI)</label>
-                <select id="login-role">
-                    <option value="USER">User</option>
-                    <option value="OWNER">Owner</option>
-                    <option value="ADMIN">Admin</option>
-                </select>
-            </div>
+            
             <button class="btn btn-primary btn-full" style="margin-top:8px;" onclick="doLogin()">Sign in</button>
             <div style="margin-top:16px; text-align:center;">
                 <span style="font-size:12px;color:var(--hint);">No account? </span>
@@ -60,11 +53,12 @@
                 <div class="form-group">
                     <label>Role</label>
                     <select id="reg-role">
-                        <option value="USER">User</option>
-                        <option value="OWNER">Owner</option>
-                        <option value="ADMIN">Admin</option>
+                        <option value="USER">USER</option>
+                        <option value="OWNER">OWNER</option>
+                        <option value="ADMIN">ADMIN</option>
                     </select>
                 </div>
+                
             </div>
             <div class="modal-footer">
                 <button class="btn" onclick="closeModal('modal-register')">Cancel</button>
@@ -82,7 +76,7 @@
             </div>
             <nav class="sidebar-nav">
                 <div class="nav-section-label">General</div>
-                <button class="nav-item active" onclick="goto('dashboard')" id="nav-dashboard">
+                <button class="nav-item active" onclick="goto('dashboard')" id="nav-dashboard" data-nav-page="dashboard">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                         <rect x="1" y="1" width="6" height="6" rx="1" />
                         <rect x="9" y="1" width="6" height="6" rx="1" />
@@ -91,39 +85,66 @@
                     </svg>
                     Dashboard
                 </button>
-                <button class="nav-item" onclick="goto('lots')" id="nav-lots">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <rect x="1" y="4" width="14" height="10" rx="1" />
-                        <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1" />
-                        <path d="M1 8h14" />
-                    </svg>
-                    Parking Lots
-                </button>
-                <button class="nav-item" onclick="goto('slots')" id="nav-slots">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <rect x="1" y="1" width="14" height="14" rx="1" />
-                        <path d="M5 5h3.5a1.5 1.5 0 010 3H5V5z" />
-                    </svg>
-                    Slots
-                </button>
-                <div class="nav-section-label" style="margin-top:8px;">User</div>
-                <button class="nav-item" onclick="goto('bookings')" id="nav-bookings">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <rect x="2" y="2" width="12" height="12" rx="1" />
-                        <path d="M5 2V0M11 2V0M2 6h12" />
-                    </svg>
-                    My Bookings
-                </button>
-                <div id="admin-nav-section" style="display:none;">
+                <div id="user-nav-section" data-role-section style="display:none;">
+                    <div class="nav-section-label" style="margin-top:8px;">User</div>
+                    <button class="nav-item" onclick="goto('lots')" data-nav-page="lots">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="1" y="4" width="14" height="10" rx="1" />
+                            <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1" />
+                            <path d="M1 8h14" />
+                        </svg>
+                        Parking Lots
+                    </button>
+                    <button class="nav-item" onclick="goto('slots')" data-nav-page="slots">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="1" y="1" width="14" height="14" rx="1" />
+                            <path d="M5 5h3.5a1.5 1.5 0 010 3H5V5z" />
+                        </svg>
+                        Parking Slots
+                    </button>
+                    <button class="nav-item" onclick="goto('bookings')" data-nav-page="bookings">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="2" y="2" width="12" height="12" rx="1" />
+                            <path d="M5 2V0M11 2V0M2 6h12" />
+                        </svg>
+                        My Bookings
+                    </button>
+                </div>
+                <div id="owner-nav-section" data-role-section style="display:none;">
+                    <div class="nav-section-label" style="margin-top:8px;">Owner</div>
+                    <button class="nav-item" onclick="goto('lots')" data-nav-page="lots">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="1" y="4" width="14" height="10" rx="1" />
+                            <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1" />
+                            <path d="M1 8h14" />
+                        </svg>
+                        Parking Lots
+                    </button>
+                    <button class="nav-item" onclick="goto('slots')" data-nav-page="slots">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="1" y="1" width="14" height="14" rx="1" />
+                            <path d="M5 5h3.5a1.5 1.5 0 010 3H5V5z" />
+                        </svg>
+                        Parking Slots
+                    </button>
+                </div>
+                <div id="admin-nav-section" data-role-section style="display:none;">
                     <div class="nav-section-label" style="margin-top:8px;">Admin</div>
-                    <button class="nav-item" onclick="goto('admin-users')" id="nav-admin-users">
+                    <button class="nav-item" onclick="goto('slots')" data-nav-page="slots">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="1" y="1" width="14" height="14" rx="1" />
+                            <path d="M5 5h3.5a1.5 1.5 0 010 3H5V5z" />
+                        </svg>
+                        Slots
+                    </button>
+                    <button class="nav-item" onclick="goto('admin-users')" data-nav-page="admin-users">
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                             <circle cx="8" cy="5" r="3" />
                             <path d="M1 14c0-3.314 3.134-6 7-6s7 2.686 7 6" />
                         </svg>
                         Users
                     </button>
-                    <button class="nav-item" onclick="goto('admin-lots')" id="nav-admin-lots">
+                    <button class="nav-item" onclick="goto('admin-lots')" data-nav-page="admin-lots">
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M1 12L5 4l3 5 2-3 4 6H1z" />
                         </svg>
@@ -150,6 +171,7 @@
                 <div class="page-header">
                     <div class="page-title">Dashboard</div>
                     <div class="page-sub">Overview of your parking system</div>
+                    <div class="dashboard-account" id="dashboard-account-heading"></div>
                 </div>
                 <div class="auth-bar">
                     <div class="auth-indicator on" id="conn-dot"></div>
@@ -164,12 +186,12 @@
                         <div class="stat-label">Slots</div>
                         <div class="stat-val" id="dash-slots">—</div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" id="dash-bookings-card">
                         <div class="stat-label">My Bookings</div>
                         <div class="stat-val" id="dash-bookings">—</div>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card" id="dash-recent-bookings-card">
                     <div class="card-header">
                         <div class="card-title">Recent bookings</div>
                     </div>
