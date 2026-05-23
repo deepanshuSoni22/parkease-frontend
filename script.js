@@ -1,5 +1,5 @@
 const BASE = 'https://parkease-production-web.up.railway.app'; // ->  PRODUCTION URL
-const BASE = 'http://localhost:8080'; // -> LOCAL DEV URL
+// const BASE = 'http://localhost:8080'; // -> LOCAL DEV URL
 
 let SESSION = { username: '', role: '' };
 const ROLE_NAV = {
