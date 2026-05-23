@@ -1,5 +1,15 @@
-const BASE = 'https://parkease-production-web.up.railway.app'; // ->  PRODUCTION URL
-// const BASE = 'http://localhost:8080'; // -> LOCAL DEV URL
+const PROD_API_BASE = 'https://parkease-production-web.up.railway.app';
+const LOCAL_API_BASE = 'http://localhost:8080';
+
+function resolveApiBase() {
+	const { hostname } = window.location;
+	if (hostname === 'localhost' || hostname === '127.0.0.1') {
+		return LOCAL_API_BASE;
+	}
+	return PROD_API_BASE;
+}
+
+const BASE = resolveApiBase();
 
 let SESSION = { username: '', role: '' };
 const ROLE_NAV = {
@@ -126,6 +136,7 @@ function startApp() {
 	document.getElementById('sidebar-name').textContent = SESSION.username;
 	document.getElementById('sidebar-role').textContent = SESSION.role;
 	document.getElementById('sidebar-avatar').textContent = SESSION.username.slice(0, 2).toUpperCase();
+	updateConnectionStatus();
 	updateDashboardIdentity();
 	syncSidebarForRole();
 	goto('dashboard');
@@ -183,6 +194,13 @@ function updateDashboardIdentity() {
 	const el = document.getElementById('dashboard-account-heading');
 	if (!el) return;
 	el.textContent = `Logged in as ${SESSION.username} (${SESSION.role})`;
+}
+
+function updateConnectionStatus() {
+	const el = document.getElementById('conn-text');
+	if (!el) return;
+	const hostLabel = BASE.replace(/^https?:\/\//, '');
+	el.innerHTML = `Connected to <strong>${hostLabel}</strong>`;
 }
 
 function resolveAllowedPage(page) {
@@ -305,22 +323,23 @@ async function loadSlots() {
 			return;
 		}
 		wrap.innerHTML = `<table class="tbl">
-      <thead><tr><th>ID</th><th>Slot #</th><th>Type</th><th>Available</th>${canDeleteSlots ? '<th></th>' : ''}</tr></thead>
-      <tbody>${data
+      <thead><tr><th>ID</th><th>Slot #</th><th>Type</th><th>Available</th><th>Booked By</th>${canDeleteSlots ? '<th></th>' : ''}</tr></thead>
+      	<tbody>${data
 			.map(
 				(s) => `<tr>
-        <td class="mono">${s.id}</td>
-        <td style="font-weight:500">${s.slotNumber}</td>
-        <td>${esc(s.slotType)}</td>
-        <td><span class="badge ${s.available ? 'badge-success' : 'badge-danger'}">${s.available ? 'Available' : 'Occupied'}</span></td>
-        ${
+			<td class="mono">${s.id}</td>
+			<td style="font-weight:500">${s.slotNumber}</td>
+			<td>${esc(s.slotType)}</td>
+			<td><span class="badge ${s.available ? 'badge-success' : 'badge-danger'}">${s.available ? 'Available' : 'Occupied'}</span></td>
+			<td>${s.available ? '—' : esc(s.bookedByUsername || '—')}</td>
+			${
 					canDeleteSlots
 						? `<td><div class="row-actions">
-          <button class="btn btn-sm btn-danger" onclick="deleteSlot(${s.id})">Delete</button>
-        </div></td>`
+				<button class="btn btn-sm btn-danger" onclick="deleteSlot(${s.id})">Delete</button>
+				</div></td>`
 						: ''
 				}
-      </tr>`
+		</tr>`
 			)
 			.join('')}</tbody>
     </table>`;
