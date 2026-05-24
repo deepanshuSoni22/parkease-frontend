@@ -18,6 +18,15 @@ const ROLE_NAV = {
 	ADMIN: ['dashboard', 'slots', 'admin-users', 'admin-lots'],
 };
 
+const SLOT_AVAILABLE_TOPIC = '/topic/slot-available';
+const SLOT_AVAILABLE_WS_PATH = '/ws';
+
+let slotAvailabilityClient = null;
+let slotAvailabilitySocket = null;
+let slotAvailabilityReconnectTimer = null;
+let slotAvailabilityEnabled = false;
+const slotAvailabilityToastCache = new Map();
+
 function getCsrfToken() {
     const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
     return match ? decodeURIComponent(match[1]) : null;
@@ -101,6 +110,7 @@ async function doLogin() {
 }
 
 async function doLogout() {
+	closeSlotAvailabilityListener();
 	try {
 		await fetch(BASE + '/api/v1/auth/logout', {
 			method: 'POST',
@@ -139,6 +149,7 @@ function startApp() {
 	updateConnectionStatus();
 	updateDashboardIdentity();
 	syncSidebarForRole();
+	initSlotAvailabilityListener();
 	goto('dashboard');
 }
 
@@ -508,6 +519,190 @@ async function loadAdminLots() {
 function roleClass(r) {
 	return r === 'ADMIN' ? 'badge-warning' : r === 'OWNER' ? 'badge-success' : 'badge-neutral';
 }
+
+function isUserSession() {
+	return SESSION.role === 'USER';
+}
+
+function buildHttpUrl(path) {
+	return BASE.replace(/\/$/, '') + path;
+}
+
+function buildWebSocketUrl(path) {
+	const base = BASE.replace(/\/$/, '');
+	if (base.startsWith('https://')) {
+		return 'wss://' + base.slice('https://'.length) + path;
+	}
+	if (base.startsWith('http://')) {
+		return 'ws://' + base.slice('http://'.length) + path;
+	}
+	return base + path;
+}
+
+function isSlotsPageVisible() {
+	const page = document.getElementById('page-slots');
+	return page && page.style.display !== 'none';
+}
+
+function extractSlotAvailabilityEvent(payload) {
+	const slotId = payload?.slotId ?? payload?.id ?? payload?.slot?.id;
+	const slotNumber = payload?.slotNumber ?? payload?.slot?.slotNumber ?? slotId ?? 'unknown';
+	let isAvailable = true;
+
+	if (payload && Object.prototype.hasOwnProperty.call(payload, 'available')) {
+		isAvailable = Boolean(payload.available);
+	} else if (payload && Object.prototype.hasOwnProperty.call(payload, 'currentAvailable')) {
+		isAvailable = Boolean(payload.currentAvailable);
+	} else if (payload && Object.prototype.hasOwnProperty.call(payload, 'isAvailable')) {
+		isAvailable = Boolean(payload.isAvailable);
+	} else if (typeof payload?.status === 'string') {
+		isAvailable = payload.status.toUpperCase() === 'AVAILABLE';
+	}
+
+	return {
+		cacheKey: slotId == null ? null : String(slotId),
+		slotNumber,
+		isAvailable,
+	};
+}
+
+function showToast(title, message, variant = 'success') {
+	const container = document.getElementById('toast-container');
+	if (!container) return;
+
+	const toast = document.createElement('div');
+	toast.className = 'toast toast-' + variant;
+	toast.innerHTML = `
+		<div class="toast-body">
+			<div class="toast-title">${esc(title)}</div>
+			<div class="toast-message">${esc(message)}</div>
+		</div>
+	`;
+	container.appendChild(toast);
+
+	requestAnimationFrame(() => toast.classList.add('show'));
+	window.setTimeout(() => {
+		toast.classList.remove('show');
+		window.setTimeout(() => toast.remove(), 220);
+	}, 3600);
+}
+
+function handleSlotAvailableMessage(rawMessage) {
+	if (!isUserSession()) return;
+
+	let payload = rawMessage;
+	if (typeof rawMessage === 'string') {
+		try {
+			payload = JSON.parse(rawMessage);
+		} catch {
+			payload = { slotNumber: rawMessage };
+		}
+	}
+
+	const slotData = extractSlotAvailabilityEvent(payload);
+	if (!slotData.isAvailable) return;
+
+	const cacheKey = slotData.cacheKey || String(slotData.slotNumber);
+	const lastToastAt = slotAvailabilityToastCache.get(cacheKey) || 0;
+	if (Date.now() - lastToastAt < 4000) {
+		return;
+	}
+
+	slotAvailabilityToastCache.set(cacheKey, Date.now());
+	showToast('Slot available', 'Slot #' + slotData.slotNumber + ' is now available.', 'success');
+
+	if (isSlotsPageVisible()) {
+		loadSlots();
+	}
+}
+
+function scheduleSlotAvailabilityReconnect() {
+	if (!slotAvailabilityEnabled || !isUserSession()) return;
+	if (slotAvailabilityReconnectTimer) return;
+	slotAvailabilityReconnectTimer = window.setTimeout(() => {
+		slotAvailabilityReconnectTimer = null;
+		connectSlotAvailabilityListener();
+	}, 5000);
+}
+
+function closeSlotAvailabilityListener() {
+	slotAvailabilityEnabled = false;
+	if (slotAvailabilityReconnectTimer) {
+		clearTimeout(slotAvailabilityReconnectTimer);
+		slotAvailabilityReconnectTimer = null;
+	}
+	slotAvailabilityToastCache.clear();
+
+	if (slotAvailabilityClient) {
+		try {
+			slotAvailabilityClient.disconnect(() => {});
+		} catch (e) {}
+	}
+
+	if (slotAvailabilitySocket) {
+		try {
+			if (typeof slotAvailabilitySocket.close === 'function') {
+				slotAvailabilitySocket.close();
+			}
+		} catch (e) {}
+	}
+
+	slotAvailabilityClient = null;
+	slotAvailabilitySocket = null;
+}
+
+function connectSlotAvailabilityListener() {
+	if (!slotAvailabilityEnabled || !isUserSession()) return;
+
+	if (window.SockJS && window.Stomp) {
+		const socket = new SockJS(buildHttpUrl(SLOT_AVAILABLE_WS_PATH));
+		const client = window.Stomp.over(socket);
+		client.debug = null;
+		client.reconnect_delay = 5000;
+
+		client.connect(
+			{},
+			() => {
+				slotAvailabilitySocket = socket;
+				slotAvailabilityClient = client;
+				client.subscribe(SLOT_AVAILABLE_TOPIC, (frame) => {
+					handleSlotAvailableMessage(frame.body);
+				});
+			},
+			() => {
+				scheduleSlotAvailabilityReconnect();
+			}
+		);
+		return;
+	}
+
+	if (!('WebSocket' in window)) {
+		showToast('Notifications unavailable', 'This browser cannot open live notifications.', 'warning');
+		return;
+	}
+
+	const socket = new WebSocket(buildWebSocketUrl(SLOT_AVAILABLE_WS_PATH));
+	slotAvailabilitySocket = socket;
+
+	socket.onmessage = (event) => {
+		handleSlotAvailableMessage(event.data);
+	};
+	socket.onclose = () => {
+		scheduleSlotAvailabilityReconnect();
+	};
+	socket.onerror = () => {
+		try {
+			socket.close();
+		} catch (e) {}
+	};
+}
+
+function initSlotAvailabilityListener() {
+	closeSlotAvailabilityListener();
+	if (!isUserSession()) return;
+	slotAvailabilityEnabled = true;
+	connectSlotAvailabilityListener();
+}
 function esc(s) {
 	return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -530,6 +725,8 @@ document.querySelectorAll('.modal-overlay').forEach((o) => {
 		if (e.target === o) closeModal(o.id);
 	});
 });
+
+window.addEventListener('beforeunload', closeSlotAvailabilityListener);
 
 // Enter to login
 document.addEventListener('keydown', (e) => {
