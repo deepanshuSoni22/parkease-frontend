@@ -1,4 +1,4 @@
-const PROD_API_BASE = 'https://parkease-production-web.up.railway.app';
+const PROD_API_BASE = 'https://parkeasebackend.me';
 const LOCAL_API_BASE = 'http://localhost:8080';
 
 function resolveApiBase() {
@@ -71,7 +71,7 @@ async function doLogin() {
 		showAlert('login-alert', 'Cannot reach API: ' + (e.message || e));
 		return;
 	}
-	
+
     const u = document.getElementById('login-user').value.trim();
     const p = document.getElementById('login-pass').value;
     
