@@ -65,8 +65,13 @@ async function initCsrf() {
 
 // Auth
 async function doLogin() {
-	await initCsrf();
-
+	try {
+		await initCsrf();
+	} catch (e) {
+		showAlert('login-alert', 'Cannot reach API: ' + (e.message || e));
+		return;
+	}
+	
     const u = document.getElementById('login-user').value.trim();
     const p = document.getElementById('login-pass').value;
     
