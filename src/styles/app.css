@@ -1,0 +1,21 @@
+.app-loading-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.page-title-block {
+  padding-bottom: 0.25rem;
+}
+
+.status-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--bs-success);
+  box-shadow: 0 0 0 6px rgba(var(--bs-success-rgb), 0.15);
+}
+
+.detail-list > div {
+  margin-bottom: 0.5rem;
+}
