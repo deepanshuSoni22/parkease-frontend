@@ -12,10 +12,12 @@ function resolveApiBase() {
 const BASE = resolveApiBase();
 
 let SESSION = { username: '', role: '' };
+let selectedParkingLot = null;
+let pendingBookingSlotId = null;
 const ROLE_NAV = {
-	USER: ['dashboard', 'lots', 'slots', 'bookings'],
-	OWNER: ['dashboard', 'lots', 'slots'],
-	ADMIN: ['dashboard', 'slots', 'admin-users', 'admin-lots'],
+	USER: ['dashboard', 'lots', 'bookings'],
+	OWNER: ['dashboard', 'lots'],
+	ADMIN: ['dashboard', 'lots', 'admin-users', 'admin-lots', 'admin-bookings'],
 };
 
 const SLOT_AVAILABLE_TOPIC = '/topic/slot-available';
@@ -116,6 +118,7 @@ async function doLogin() {
 
 async function doLogout() {
 	closeSlotAvailabilityListener();
+	selectedParkingLot = null;
 	try {
 		await fetch(BASE + '/api/v1/auth/logout', {
 			method: 'POST',
@@ -146,11 +149,14 @@ async function initApp() {
 }
 
 function startApp() {
+	selectedParkingLot = null;
 	document.getElementById('login-screen').style.display = 'none';
 	document.getElementById('app-screen').style.display = 'flex';
 	document.getElementById('sidebar-name').textContent = SESSION.username;
 	document.getElementById('sidebar-role').textContent = SESSION.role;
 	document.getElementById('sidebar-avatar').textContent = SESSION.username.slice(0, 2).toUpperCase();
+	const newSlotButton = document.getElementById('new-slot-btn');
+	if (newSlotButton) newSlotButton.style.display = SESSION.role === 'USER' ? 'none' : 'inline-flex';
 	updateConnectionStatus();
 	updateDashboardIdentity();
 	syncSidebarForRole();
@@ -228,10 +234,10 @@ function resolveAllowedPage(page) {
 async function loadPage(page) {
 	if (page === 'dashboard') loadDashboard();
 	if (page === 'lots') loadLots();
-	if (page === 'slots') loadSlots();
 	if (page === 'bookings') loadBookings();
 	if (page === 'admin-users') loadAdminUsers();
 	if (page === 'admin-lots') loadAdminLots();
+	if (page === 'admin-bookings') loadAdminBookings();
 }
 
 // Dashboard
@@ -265,19 +271,22 @@ async function loadDashboard() {
 // Lots
 async function loadLots() {
 	const wrap = document.getElementById('lots-table-wrap');
+	const slotsWrap = document.getElementById('lot-slots-wrap');
 	try {
 		const path = SESSION.role === 'OWNER' ? '/api/v1/parking-lots/my' : '/api/v1/parking-lots';
 		const canDeleteLots = SESSION.role === 'OWNER';
-		const data = await api('GET', path);
+		const [lotsResult, slotsResult] = await Promise.allSettled([api('GET', path), api('GET', '/api/v1/parking-slots')]);
+		const data = lotsResult.status === 'fulfilled' ? lotsResult.value : [];
+		const slots = slotsResult.status === 'fulfilled' ? slotsResult.value : [];
+
 		if (!data.length) {
 			wrap.innerHTML = '<div class="empty-state">No lots found</div>';
-			return;
-		}
+		} else {
 		wrap.innerHTML = `<table class="tbl">
       <thead><tr><th>ID</th><th>Name</th><th>Location</th><th>Rate/hr</th><th>Slots</th><th>Owner</th><th>Status</th>${canDeleteLots ? '<th></th>' : ''}</tr></thead>
       <tbody>${data
 			.map(
-				(l) => `<tr>
+				(l) => `<tr class="lot-row ${selectedParkingLot?.id === l.id ? 'selected' : ''}" onclick="selectParkingLot(${l.id}, ${JSON.stringify(l.name)})">
         <td class="mono">${l.id}</td>
         <td style="font-weight:500">${esc(l.name)}</td>
         <td style="color:var(--muted)">${esc(l.location)}</td>
@@ -287,8 +296,8 @@ async function loadLots() {
         <td><span class="badge ${l.active ? 'badge-success' : 'badge-neutral'}">${l.active ? 'Active' : 'Inactive'}</span></td>
 				${
 					canDeleteLots
-						? `<td><div class="row-actions">
-					<button class="btn btn-sm btn-danger" onclick="deleteLot(${l.id})">Delete</button>
+						? `<td><div class="row-actions row-actions-end">
+						<button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteLot(${l.id})">Delete</button>
 				</div></td>`
 						: ''
 				}
@@ -296,6 +305,98 @@ async function loadLots() {
 			)
 			.join('')}</tbody>
     </table>`;
+		}
+
+		if (slotsWrap) {
+			renderParkingLotSlots(slots, slotsWrap);
+		}
+	} catch (e) {
+		wrap.innerHTML = `<div class="empty-state" style="color:var(--danger)">${e.message}</div>`;
+		if (slotsWrap) slotsWrap.innerHTML = `<div class="empty-state" style="color:var(--danger)">${e.message}</div>`;
+	}
+}
+
+function selectParkingLot(lotId, lotName) {
+	selectedParkingLot = { id: lotId, name: lotName };
+	updateSelectedLotHeader();
+	loadParkingLotSlots();
+}
+
+function clearSelectedParkingLot() {
+	selectedParkingLot = null;
+	updateSelectedLotHeader();
+	loadParkingLotSlots();
+	loadLots();
+}
+
+function updateSelectedLotHeader() {
+	const title = document.getElementById('selected-lot-title');
+	const subtitle = document.getElementById('selected-lot-subtitle');
+	const button = document.getElementById('show-all-slots-btn');
+	if (selectedParkingLot) {
+		if (title) title.textContent = `${selectedParkingLot.name} slots`;
+		if (subtitle) subtitle.textContent = `Showing slots for parking lot #${selectedParkingLot.id}.`;
+		if (button) button.style.display = 'inline-flex';
+		return;
+	}
+	if (title) title.textContent = 'Parking Slots';
+	if (subtitle) subtitle.textContent = 'Select a parking lot to filter its slots.';
+	if (button) button.style.display = 'none';
+}
+
+function getSlotLotId(slot) {
+	return slot?.parkingLotId ?? slot?.parkingLot?.id ?? slot?.lotId ?? slot?.parkingLot?.parkingLotId ?? slot?.parkingLot?.lotId ?? null;
+}
+
+function getSlotLotName(slot) {
+	return slot?.parkingLotName ?? slot?.parkingLot?.name ?? slot?.lotName ?? '—';
+}
+
+function normalizeSlotsForSelectedLot(slots) {
+	if (!selectedParkingLot) return slots;
+	return slots.filter((slot) => {
+		const slotLotId = getSlotLotId(slot);
+		if (slotLotId != null) return String(slotLotId) === String(selectedParkingLot.id);
+		const slotLotName = getSlotLotName(slot);
+		return slotLotName !== '—' && slotLotName === selectedParkingLot.name;
+	});
+}
+
+function renderParkingLotSlots(slots, wrap) {
+	updateSelectedLotHeader();
+	const filteredSlots = normalizeSlotsForSelectedLot(slots);
+	if (!filteredSlots.length) {
+		wrap.innerHTML = '<div class="empty-state">No parking slots found for this selection</div>';
+		return;
+	}
+	wrap.innerHTML = `<table class="tbl">
+      <thead><tr><th>ID</th><th>Lot</th><th>Slot #</th><th>Type</th><th>Available</th><th>Booked By</th><th></th></tr></thead>
+      <tbody>${filteredSlots
+		.map(
+			(s) => `<tr>
+			<td class="mono">${s.id}</td>
+			<td style="font-weight:500">${esc(getSlotLotName(s))}</td>
+			<td style="font-weight:500">${s.slotNumber}</td>
+			<td>${esc(s.slotType)}</td>
+			<td><span class="badge ${s.available ? 'badge-success' : 'badge-danger'}">${s.available ? 'Available' : 'Occupied'}</span></td>
+			<td>${s.available ? '—' : esc(s.bookedByUsername || '—')}</td>
+			<td>
+				<div class="row-actions row-actions-end">
+					${SESSION.role === 'USER' && s.available ? `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); bookSlotFromList(${s.id})">Book</button>` : ''}
+					${SESSION.role === 'OWNER' ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteSlot(${s.id})">Delete</button>` : ''}
+				</div>
+			</td>
+		</tr>`
+		)
+		.join('')}</tbody>
+    </table>`;
+}
+
+async function loadParkingLotSlots() {
+	const wrap = document.getElementById('lot-slots-wrap');
+	try {
+		const data = await api('GET', '/api/v1/parking-slots');
+		renderParkingLotSlots(data, wrap);
 	} catch (e) {
 		wrap.innerHTML = `<div class="empty-state" style="color:var(--danger)">${e.message}</div>`;
 	}
@@ -330,38 +431,7 @@ async function deleteLot(id) {
 
 // Slots
 async function loadSlots() {
-	const wrap = document.getElementById('slots-table-wrap');
-	try {
-		const canDeleteSlots = SESSION.role === 'OWNER';
-		const data = await api('GET', '/api/v1/parking-slots');
-		if (!data.length) {
-			wrap.innerHTML = '<div class="empty-state">No slots found</div>';
-			return;
-		}
-		wrap.innerHTML = `<table class="tbl">
-      <thead><tr><th>ID</th><th>Slot #</th><th>Type</th><th>Available</th><th>Booked By</th>${canDeleteSlots ? '<th></th>' : ''}</tr></thead>
-      	<tbody>${data
-			.map(
-				(s) => `<tr>
-			<td class="mono">${s.id}</td>
-			<td style="font-weight:500">${s.slotNumber}</td>
-			<td>${esc(s.slotType)}</td>
-			<td><span class="badge ${s.available ? 'badge-success' : 'badge-danger'}">${s.available ? 'Available' : 'Occupied'}</span></td>
-			<td>${s.available ? '—' : esc(s.bookedByUsername || '—')}</td>
-			${
-					canDeleteSlots
-						? `<td><div class="row-actions">
-				<button class="btn btn-sm btn-danger" onclick="deleteSlot(${s.id})">Delete</button>
-				</div></td>`
-						: ''
-				}
-		</tr>`
-			)
-			.join('')}</tbody>
-    </table>`;
-	} catch (e) {
-		wrap.innerHTML = `<div class="empty-state" style="color:var(--danger)">${e.message}</div>`;
-	}
+	return loadParkingLotSlots();
 }
 
 async function createSlot() {
@@ -400,7 +470,8 @@ async function loadBookings() {
 		}
 		renderBookingTable(data, 'bookings-table-wrap', false);
 	} catch (e) {
-		wrap.innerHTML = `<div class="empty-state" style="color:var(--danger)">${e.message}</div>`;
+		const message = e?.message ? String(e.message) : 'Unable to load your bookings.';
+		wrap.innerHTML = `<div class="empty-state" style="color:var(--danger)">${esc(message)}</div>`;
 	}
 }
 
@@ -411,7 +482,7 @@ function renderBookingTable(data, containerId, compact) {
 		return;
 	}
 	el.innerHTML = `<table class="tbl">
-		<thead><tr><th>ID</th><th>Lot</th><th>Slot</th><th>Type</th><th>Status</th><th>Booked at</th>${!compact ? '<th></th>' : ''}</tr></thead>
+		<thead><tr><th>ID</th><th>Lot</th><th>Slot</th><th>Type</th><th>Duration</th><th>Status</th><th>Booked at</th>${!compact ? '<th></th>' : ''}</tr></thead>
 		<tbody>${data
 		.map(
 			(b) => `<tr>
@@ -419,12 +490,14 @@ function renderBookingTable(data, containerId, compact) {
 			<td style="font-weight:500">${esc(b.parkingLotName || '—')}</td>
 			<td>${b.slotNumber || b.slotId}</td>
 			<td style="color:var(--muted)">${esc(b.slotType || '—')}</td>
+			<td>${formatDurationMinutes(b.durationMinutes)}</td>
 			<td><span class="badge ${b.status === 'ACTIVE' ? 'badge-success' : 'badge-neutral'}">${b.status}</span></td>
 			<td style="color:var(--muted)">${b.bookedAt ? new Date(b.bookedAt).toLocaleString() : '—'}</td>
 			${
 			!compact
 				? `<td><div class="row-actions">
-				${b.status === 'ACTIVE' ? `<button class="btn btn-sm" onclick="completeBooking(${b.id})">Complete</button>` : ''}
+						${(SESSION.role === 'ADMIN' || SESSION.role === 'USER') && b.status === 'ACTIVE' ? `<button class="btn btn-sm" onclick="completeBooking(${b.id})">Complete</button>` : ''}
+						${SESSION.role === 'ADMIN' ? `<button class="btn btn-sm" onclick="viewAdminBooking(${b.id})">View</button>` : ''}
 			</div></td>`
 				: ''
 		}
@@ -436,25 +509,149 @@ function renderBookingTable(data, containerId, compact) {
 
 async function createBooking() {
 	const slotId = parseInt(document.getElementById('booking-slot-id').value);
+	const durationMinutes = getBookingDurationMinutes();
 	if (!slotId) {
-		showAlert('booking-alert', 'Enter a valid slot ID');
+		showAlert('booking-alert', 'Select a slot first');
+		return;
+	}
+	if (!durationMinutes) {
+		showAlert('booking-alert', 'Enter a valid booking duration');
 		return;
 	}
 	try {
-		await api('POST', '/api/v1/bookings', { slotId });
+		await api('POST', '/api/v1/bookings', { slotId, durationMinutes });
 		closeModal('modal-booking');
 		loadBookings();
+		loadParkingLotSlots();
 	} catch (e) {
 		showAlert('booking-alert', e.message);
 	}
 }
 
+function bookSlotFromList(slotId) {
+	openBookingModal(slotId);
+}
+
+
+function toggleBookingDurationInput() {
+	const preset = document.getElementById('booking-duration-preset');
+	const customWrap = document.getElementById('booking-duration-custom-wrap');
+	if (!preset || !customWrap) return;
+	customWrap.style.display = preset.value === 'custom' ? 'block' : 'none';
+}
+
+function getBookingDurationMinutes() {
+	const preset = document.getElementById('booking-duration-preset');
+	if (!preset) return null;
+	if (preset.value === 'custom') {
+		const customValue = parseInt(document.getElementById('booking-duration-minutes').value);
+		return Number.isFinite(customValue) && customValue > 0 ? customValue : null;
+	}
+	const presetValue = parseInt(preset.value);
+	return Number.isFinite(presetValue) && presetValue > 0 ? presetValue : null;
+}
+
+function formatDurationMinutes(minutes) {
+	if (!Number.isFinite(minutes) || minutes <= 0) return '—';
+	if (minutes % 60 === 0) {
+		const hours = minutes / 60;
+		return hours === 1 ? '1 hr' : hours + ' hrs';
+	}
+	return minutes + ' min';
+}
+
+function prepareBookingModal() {
+	prepareBookingModalForSlot(null);
+}
+
+function prepareBookingModalForSlot(slotId) {
+	const slotInput = document.getElementById('booking-slot-id');
+	const slotSummary = document.getElementById('booking-selected-slot');
+	const durationPreset = document.getElementById('booking-duration-preset');
+	const durationCustom = document.getElementById('booking-duration-minutes');
+	if (slotInput) slotInput.value = slotId || '';
+	if (slotSummary) {
+		slotSummary.textContent = slotId ? `Slot #${slotId} selected` : 'No slot selected';
+	}
+	if (durationPreset) durationPreset.value = '60';
+	if (durationCustom) durationCustom.value = '';
+	toggleBookingDurationInput();
+}
+
+function openBookingModal(slotId) {
+	pendingBookingSlotId = slotId;
+	openModal('modal-booking');
+}
 async function completeBooking(id) {
 	try {
 		await api('PUT', '/api/v1/bookings/' + id + '/complete');
-		loadBookings();
+		if (SESSION.role === 'ADMIN') {
+			loadAdminBookings();
+		} else {
+			loadBookings();
+		}
+		loadParkingLotSlots();
 	} catch (e) {
 		alert(e.message);
+	}
+}
+// Admin bookings
+async function loadAdminBookings() {
+	const wrap = document.getElementById('admin-bookings-wrap');
+	try {
+		const data = await api('GET', '/api/v1/bookings');
+		if (!data.length) {
+			wrap.innerHTML = '<div class="empty-state">No bookings</div>';
+			return;
+		}
+		renderBookingTable(data, 'admin-bookings-wrap', false);
+	} catch (e) {
+		wrap.innerHTML = `<div class="empty-state" style="color:var(--danger)">${e.message}</div>`;
+	}
+}
+
+async function viewAdminBooking(id) {
+	try {
+		const data = await api('GET', '/api/v1/bookings/' + id);
+		const detailsEl = document.getElementById('admin-booking-details');
+		if (!detailsEl) return;
+		const html = `
+			<div><strong>ID:</strong> <span class="mono">${data.id}</span></div>
+			<div><strong>Lot:</strong> ${esc(data.parkingLotName || '—')}</div>
+			<div><strong>Slot:</strong> ${data.slotNumber || data.slotId}</div>
+			<div><strong>Type:</strong> ${esc(data.slotType || '—')}</div>
+			<div><strong>Duration:</strong> ${formatDurationMinutes(data.durationMinutes)}</div>
+			<div><strong>Status:</strong> ${data.status}</div>
+			<div><strong>Booked by:</strong> ${esc(data.bookedByUsername || '—')}</div>
+			<div><strong>Booked at:</strong> ${data.bookedAt ? new Date(data.bookedAt).toLocaleString() : '—'}</div>
+		`;
+		detailsEl.innerHTML = html;
+		const btn = document.getElementById('admin-booking-complete-btn');
+		if (btn) {
+			const isCompleted = String(data.status).toUpperCase() === 'COMPLETED';
+			btn.style.display = isCompleted ? 'none' : 'inline-flex';
+			btn.onclick = async () => {
+				try {
+					await completeBookingAdmin(id);
+				} catch (e) {
+					document.getElementById('admin-booking-alert').textContent = e.message || e;
+					document.getElementById('admin-booking-alert').className = 'alert show alert-err';
+				}
+			};
+		}
+		openModal('modal-admin-booking');
+	} catch (e) {
+		alert(e.message);
+	}
+}
+
+async function completeBookingAdmin(id) {
+	try {
+		await api('PUT', '/api/v1/bookings/' + id + '/complete');
+		closeModal('modal-admin-booking');
+		loadAdminBookings();
+	} catch (e) {
+		throw e;
 	}
 }
 
@@ -545,7 +742,7 @@ function buildWebSocketUrl(path) {
 }
 
 function isSlotsPageVisible() {
-	const page = document.getElementById('page-slots');
+	const page = document.getElementById('page-lots');
 	return page && page.style.display !== 'none';
 }
 
@@ -717,6 +914,10 @@ function showAlert(id, msg, ok) {
 	el.className = 'alert show ' + (ok ? 'alert-ok' : 'alert-err');
 }
 function openModal(id) {
+	if (id === 'modal-booking') {
+		prepareBookingModalForSlot(pendingBookingSlotId);
+		pendingBookingSlotId = null;
+	}
 	document.getElementById(id).classList.add('open');
 }
 function closeModal(id) {

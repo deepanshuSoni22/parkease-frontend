@@ -203,6 +203,18 @@ body {
 	margin-bottom: 16px;
 }
 
+.selected-slot-chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 10px 12px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--bg);
+	color: var(--text);
+	font-size: 14px;
+	font-weight: 500;
+}
+
 label {
 	display: block;
 	font-size: 13px;
@@ -374,6 +386,18 @@ select {
 	background: #fafaf8;
 }
 
+.lot-row {
+	cursor: pointer;
+}
+
+.lot-row.selected td {
+	background: #f3f4f0;
+}
+
+.lot-row:hover td {
+	background: #f8f8f5;
+}
+
 /* Badge */
 .badge {
 	display: inline-block;
@@ -434,6 +458,14 @@ select {
 .row-actions {
 	display: flex;
 	gap: 6px;
+}
+
+.row-actions-end {
+	justify-content: flex-end;
+}
+
+.section-gap {
+	margin-top: 28px;
 }
 
 /* Modal */
