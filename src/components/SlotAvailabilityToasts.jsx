@@ -28,20 +28,18 @@ function SlotToast({ item, onClose }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // Trigger slide-in on mount
     const show = requestAnimationFrame(() => setVisible(true));
-    // Auto-dismiss after 4 s
     const timer = setTimeout(() => handleClose(), 4000);
     return () => {
       cancelAnimationFrame(show);
       clearTimeout(timer);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleClose() {
     setVisible(false);
-    setTimeout(onClose, 300); // wait for slide-out animation
+    setTimeout(onClose, 300);
   }
 
   return (
@@ -51,37 +49,38 @@ function SlotToast({ item, onClose }) {
       style={{
         display: 'flex',
         alignItems: 'flex-start',
-        gap: '0.75rem',
-        minWidth: '18rem',
-        maxWidth: '22rem',
-        padding: '0.85rem 1rem',
-        borderRadius: '0.625rem',
-        background: 'rgba(255,255,255,0.97)',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)',
-        border: '1px solid rgba(22,163,74,0.25)',
-        borderLeft: '4px solid #16a34a',
+        gap: '0.65rem',
+        minWidth: '17rem',
+        maxWidth: '21rem',
+        padding: '0.75rem 0.875rem',
+        borderRadius: 'var(--bs-border-radius)',
+        background: 'var(--bs-body-bg)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06)',
+        border: '1px solid var(--bs-border-color)',
+        borderLeft: '3px solid var(--bs-success)',
         transform: visible ? 'translateX(0)' : 'translateX(110%)',
         opacity: visible ? 1 : 0,
-        transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease',
+        transition: 'transform 0.28s cubic-bezier(0.34,1.4,0.64,1), opacity 0.25s ease',
         marginTop: '0.5rem',
-        position: 'relative',
+        fontFamily: 'var(--bs-body-font-family)',
+        fontSize: 'var(--bs-body-font-size)',
       }}
     >
-      {/* Parking icon */}
+      {/* Icon */}
       <span
         style={{
           flexShrink: 0,
-          width: 36,
-          height: 36,
-          borderRadius: '50%',
-          background: 'rgba(22,163,74,0.12)',
+          width: 32,
+          height: 32,
+          borderRadius: 'var(--bs-border-radius)',
+          background: 'rgba(var(--bs-success-rgb), 0.1)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
         aria-hidden
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--bs-success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="3" />
           <path d="M9 17V7h4a3 3 0 0 1 0 6H9" />
         </svg>
@@ -89,15 +88,15 @@ function SlotToast({ item, onClose }) {
 
       {/* Text */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#15803d', marginBottom: '0.15rem' }}>
+        <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--bs-success)', marginBottom: '0.1rem', lineHeight: 1.3 }}>
           {item.title}
         </div>
-        <div style={{ fontSize: '0.825rem', color: '#374151', lineHeight: 1.4 }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--bs-secondary-color, var(--bs-body-color))', lineHeight: 1.4 }}>
           {item.message}
         </div>
       </div>
 
-      {/* Close button */}
+      {/* Close */}
       <button
         onClick={handleClose}
         aria-label="Dismiss notification"
@@ -107,12 +106,13 @@ function SlotToast({ item, onClose }) {
           border: 'none',
           cursor: 'pointer',
           padding: '2px',
-          color: '#9ca3af',
+          color: 'var(--bs-secondary-color, #6c757d)',
           lineHeight: 1,
           alignSelf: 'flex-start',
+          opacity: 0.6,
         }}
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M2 2l10 10M12 2L2 12" />
         </svg>
       </button>
@@ -165,12 +165,12 @@ export default function SlotAvailabilityToasts() {
           window.dispatchEvent(new Event('parkease:slots-refresh'));
         }
       },
-      onDisconnect: () => {},
+      onDisconnect: () => { },
     });
 
     if (!client) return undefined;
     clientRef.current = client;
-    client.connect().catch(() => {});
+    client.connect().catch(() => { });
 
     return () => {
       cancelled = true;
