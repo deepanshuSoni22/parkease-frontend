@@ -1,8 +1,16 @@
 import { Client } from '@stomp/stompjs';
-import { APP_CONFIG, resolveWsBase } from '../config/env';
+import SockJS from 'sockjs-client';
+import { APP_CONFIG } from '../config/env';
 
-export function buildWebSocketUrl(path = APP_CONFIG.wsPath) {
-  return resolveWsBase(APP_CONFIG.apiBase) + path;
+export function buildSockJsUrl(path = APP_CONFIG.wsPath) {
+  // SockJS requires plain http/https URL (not ws/wss) — it manages the
+  // WebSocket upgrade internally after the SockJS handshake.
+  return APP_CONFIG.apiBase + path;
+}
+
+function getXsrfToken() {
+  const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 export function createSlotAvailabilityClient({ onMessage, onDisconnect }) {
@@ -10,8 +18,14 @@ export function createSlotAvailabilityClient({ onMessage, onDisconnect }) {
     return null;
   }
 
+  const token = getXsrfToken();
+
   const client = new Client({
-    brokerURL: buildWebSocketUrl(),
+    // Backend uses .withSockJS() so we must use the SockJS factory.
+    // The 403 error was caused by localhost:5173 not being in the backend's
+    // setAllowedOrigins() list — fixed by adding it there.
+    webSocketFactory: () => new SockJS(buildSockJsUrl()),
+    connectHeaders: token ? { 'X-XSRF-TOKEN': token } : {},
     reconnectDelay: 5000,
     onConnect: () => {
       client.subscribe(APP_CONFIG.wsTopicSlotAvailability, (frame) => onMessage(frame.body));
@@ -35,3 +49,4 @@ export function createSlotAvailabilityClient({ onMessage, onDisconnect }) {
     },
   };
 }
+
