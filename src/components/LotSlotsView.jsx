@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Card, Form, Modal, Spinner, Table } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Form, Modal, Spinner, Table } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../state/AuthContext';
+import { useRazorpayPayment } from '../hooks/useRazorpayPayment';
 
 export function LotSlotsView() {
   const { lotId } = useParams();
@@ -16,6 +17,7 @@ export function LotSlotsView() {
   const [bookingSlot, setBookingSlot] = useState(null);
   const [slotForm, setSlotForm] = useState({ slotNumber: '', slotType: 'STANDARD', available: true, pricePerMinute: '' });
   const [bookingForm, setBookingForm] = useState({ durationPreset: '60', customMinutes: '' });
+  const [now, setNow] = useState(Date.now());
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -36,6 +38,21 @@ export function LotSlotsView() {
     }
   }, [lotId]);
 
+  const { startPayment, loading: paymentLoading, error: paymentError, successMessage } = useRazorpayPayment({
+    onSuccess: () => {
+      refresh();
+      window.dispatchEvent(new Event('parkease:slots-refresh'));
+      navigate('/bookings');
+    },
+    onFailure: () => {
+      refresh();
+      window.dispatchEvent(new Event('parkease:slots-refresh'));
+    },
+    onCancel: () => {
+      window.dispatchEvent(new Event('parkease:slots-refresh'));
+    },
+  });
+
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -45,6 +62,12 @@ export function LotSlotsView() {
     window.addEventListener('parkease:slots-refresh', handleRefresh);
     return () => window.removeEventListener('parkease:slots-refresh', handleRefresh);
   }, [refresh]);
+
+  // Live clock used to render countdowns
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const openBooking = (slot) => {
     setBookingSlot(slot);
@@ -66,12 +89,40 @@ export function LotSlotsView() {
 
   const createBooking = async (event) => {
     event.preventDefault();
+    setError('');
     const minutes = bookingForm.durationPreset === 'custom'
       ? parseInt(bookingForm.customMinutes, 10)
       : parseInt(bookingForm.durationPreset, 10);
-    await api.post('/api/v1/bookings', { slotId: bookingSlot.id, durationMinutes: minutes });
-    setBookingSlot(null);
-    refresh();
+
+    if (!bookingSlot) {
+      setError('Please select a slot before booking.');
+      return;
+    }
+
+    try {
+      const booking = await api.post('/api/v1/bookings', { slotId: bookingSlot.id, durationMinutes: minutes });
+      const selectedSlot = bookingSlot;
+      setBookingSlot(null);
+
+      if (booking?.status === 'PENDING_PAYMENT') {
+        const bookingId = booking.id ?? booking.bookingId;
+        if (!bookingId) {
+          throw new Error('Booking created but no booking ID was returned. Payment cannot proceed.');
+        }
+        await startPayment({
+          bookingId,
+          name: `Parking booking for ${lot?.name ?? 'ParkEase'}`,
+          description: `Slot #${selectedSlot.slotNumber} · ${minutes} min`,
+          prefill: {
+            name: session?.username,
+          },
+        });
+      } else {
+        refresh();
+      }
+    } catch (e) {
+      setError(e?.message || 'Failed to place booking. Please try again.');
+    }
   };
 
   const bookingDurationMinutes = bookingForm.durationPreset === 'custom'
@@ -109,6 +160,8 @@ export function LotSlotsView() {
 
   return (
     <div>
+      {paymentError ? <Alert variant="danger">{paymentError}</Alert> : null}
+      {successMessage ? <Alert variant="success">{successMessage}</Alert> : null}
       <Button variant="outline-secondary" size="sm" className="mb-3" onClick={() => navigate('/lots')}>
         ← Back to lots
       </Button>
@@ -132,6 +185,7 @@ export function LotSlotsView() {
                   <th>ID</th>
                   <th>Slot #</th>
                   <th>Type</th>
+                  <th>Ends in</th>
                   <th>Price/min</th>
                   <th>Available</th>
                   <th>Booked By</th>
@@ -144,6 +198,24 @@ export function LotSlotsView() {
                     <td className="font-monospace">{slot.id}</td>
                     <td className="fw-semibold">{slot.slotNumber}</td>
                     <td>{slot.slotType}</td>
+                    <td>
+                      {(() => {
+                        const endsAt = slot.bookedUntil
+                          ? new Date(slot.bookedUntil)
+                          : slot.bookedAt && slot.bookedDurationMinutes
+                          ? new Date(new Date(slot.bookedAt).getTime() + (slot.bookedDurationMinutes * 60000))
+                          : null;
+                        if (!endsAt) return '—';
+                        const secondsLeft = Math.max(0, Math.ceil((endsAt.getTime() - now) / 1000));
+                        if (secondsLeft <= 0) return 'Due';
+                        const h = Math.floor(secondsLeft / 3600);
+                        const m = Math.floor((secondsLeft % 3600) / 60);
+                        const s = secondsLeft % 60;
+                        if (h > 0) return `${h}h ${m}m`;
+                        if (m > 0) return `${m}m ${s}s`;
+                        return `${s}s`;
+                      })()}
+                    </td>
                     <td>{slot.pricePerMinute != null ? slot.pricePerMinute.toFixed(2) : '—'}</td>
                     <td>
                       <Badge bg={slot.available ? 'success' : 'danger'}>
@@ -240,7 +312,11 @@ export function LotSlotsView() {
           </Modal.Body>
           <Modal.Footer>
             <Button variant="outline-secondary" onClick={() => setBookingSlot(null)}>Cancel</Button>
-            <Button type="submit" variant="primary">Book</Button>
+            <Button type="submit" variant="primary" disabled={paymentLoading}>
+              {paymentLoading ? (
+                <><Spinner animation="border" size="sm" className="me-2" />Pay</>
+              ) : 'Book'}
+            </Button>
           </Modal.Footer>
         </Form>
       </Modal>

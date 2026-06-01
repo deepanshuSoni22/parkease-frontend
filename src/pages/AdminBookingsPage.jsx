@@ -58,12 +58,12 @@ export default function AdminBookingsPage() {
                   <td>{booking.slotNumber || booking.slotId}</td>
                   <td>{booking.slotType || '—'}</td>
                   <td>{formatDurationMinutes(booking.durationMinutes)}</td>
-                  <td><Badge bg={booking.status === 'ACTIVE' ? 'success' : 'secondary'}>{booking.status}</Badge></td>
+                  <td><Badge bg={booking.status === 'ACTIVE' || booking.status === 'CONFIRMED' ? 'success' : 'secondary'}>{booking.status}</Badge></td>
                   <td>{booking.bookedByUsername || '—'}</td>
                   <td>{booking.bookedAt ? new Date(booking.bookedAt).toLocaleString() : '—'}</td>
                   <td className="text-end d-flex gap-2 justify-content-end">
                     <Button size="sm" variant="outline-dark" onClick={() => loadBooking(booking.id)}>View</Button>
-                    {booking.status === 'ACTIVE' ? <Button size="sm" variant="dark" onClick={() => completeBooking(booking.id)}>Complete</Button> : null}
+                    {(booking.status === 'ACTIVE' || booking.status === 'CONFIRMED') ? <Button size="sm" variant="dark" onClick={() => completeBooking(booking.id)}>Complete</Button> : null}
                   </td>
                 </tr>
               )) : (
@@ -94,7 +94,7 @@ export default function AdminBookingsPage() {
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setSelectedBooking(null)}>Close</Button>
-          {selectedBooking?.status === 'ACTIVE' ? <Button variant="dark" onClick={() => completeBooking(selectedBooking.id)}>Complete</Button> : null}
+          {(selectedBooking?.status === 'ACTIVE' || selectedBooking?.status === 'CONFIRMED') ? <Button variant="dark" onClick={() => completeBooking(selectedBooking.id)}>Complete</Button> : null}
         </Modal.Footer>
       </Modal>
     </div>

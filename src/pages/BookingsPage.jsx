@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Badge, Card, Button, Table } from 'react-bootstrap';
 import { api } from '../services/api';
+import { useRazorpayPayment } from '../hooks/useRazorpayPayment';
 import { useAuth } from '../state/AuthContext';
 import { formatDurationMinutes } from '../utils/formatters';
 
@@ -21,6 +22,11 @@ export default function BookingsPage() {
     await api.put(`/api/v1/bookings/${id}/complete`);
     refresh();
   };
+
+  const { retryPayment, isRetrying } = useRazorpayPayment({
+    onSuccess: () => refresh(),
+    onFailure: (msg) => console.error('Retry failed', msg),
+  });
 
   return (
     <div>
@@ -52,11 +58,16 @@ export default function BookingsPage() {
                   <td>{booking.slotNumber || booking.slotId}</td>
                   <td>{booking.slotType || '—'}</td>
                   <td>{formatDurationMinutes(booking.durationMinutes)}</td>
-                  <td><Badge bg={booking.status === 'ACTIVE' ? 'success' : 'secondary'}>{booking.status}</Badge></td>
+                  <td><Badge bg={booking.status === 'ACTIVE' || booking.status === 'CONFIRMED' ? 'success' : 'secondary'}>{booking.status}</Badge></td>
                   <td>{booking.bookedAt ? new Date(booking.bookedAt).toLocaleString() : '—'}</td>
                   <td className="text-end">
-                    {(session?.role === 'USER' || session?.role === 'ADMIN') && booking.status === 'ACTIVE' ? (
+                    {(session?.role === 'ADMIN' || (session?.username && session.username === booking.bookedByUsername)) && (booking.status === 'ACTIVE' || booking.status === 'CONFIRMED') ? (
                       <Button size="sm" variant="outline-dark" onClick={() => completeBooking(booking.id)}>Complete</Button>
+                    ) : null}
+                    {(session?.username && session.username === booking.bookedByUsername) && (booking.status === 'PAYMENT_FAILED' || booking.status === 'PAYMENT_EXPIRED') ? (
+                      <Button size="sm" variant="primary" className="ms-2" onClick={() => retryPayment({ bookingId: booking.id, name: session.username, description: `Retry payment for booking ${booking.id}`, prefill: { name: session.username } })} disabled={isRetrying}>
+                        {isRetrying ? 'Retrying…' : 'Retry Payment'}
+                      </Button>
                     ) : null}
                   </td>
                 </tr>
