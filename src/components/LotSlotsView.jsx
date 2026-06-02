@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../state/AuthContext';
 import { useRazorpayPayment } from '../hooks/useRazorpayPayment';
+import DemoTestCards from './DemoTestCards';
 
 export function LotSlotsView() {
   const { lotId } = useParams();
@@ -294,6 +295,11 @@ export function LotSlotsView() {
                 Amount: ₹{bookingAmount.toFixed(2)}
               </div>
             ) : null}
+
+            <DemoTestCards onSelect={(card) => {
+              // helpful: copy selected card to clipboard automatically
+              if (card && navigator.clipboard) navigator.clipboard.writeText(card.number).catch(() => {});
+            }} />
             <Form.Group className="mb-3">
               <Form.Label>Duration</Form.Label>
               <Form.Select value={bookingForm.durationPreset} onChange={(e) => setBookingForm((current) => ({ ...current, durationPreset: e.target.value }))}>
