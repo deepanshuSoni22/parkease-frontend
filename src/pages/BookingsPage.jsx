@@ -4,14 +4,23 @@ import { api } from '../services/api';
 import { useRazorpayPayment } from '../hooks/useRazorpayPayment';
 import { useAuth } from '../state/AuthContext';
 import { formatDurationMinutes } from '../utils/formatters';
+import { useDelayedLoader } from '../hooks/useDelayedLoader';
+import LottieLoader from '../components/LottieLoader';
 
 export default function BookingsPage() {
   const { session } = useAuth();
   const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const showBookingsLoader = useDelayedLoader(loading, 400);
 
   const refresh = async () => {
-    const data = await api.get('/api/v1/bookings/my');
-    setBookings(data);
+    setLoading(true);
+    try {
+      const data = await api.get('/api/v1/bookings/my');
+      setBookings(data);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -37,6 +46,11 @@ export default function BookingsPage() {
 
       <Card className="shadow-sm border-0">
         <Card.Body className="p-0">
+          {showBookingsLoader ? (
+            <div className="py-4">
+              <LottieLoader size={140} message="Loading bookings..." />
+            </div>
+          ) : (
           <Table responsive hover className="mb-0 align-middle">
             <thead>
               <tr>
@@ -76,6 +90,7 @@ export default function BookingsPage() {
               )}
             </tbody>
           </Table>
+          )}
         </Card.Body>
       </Card>
     </div>

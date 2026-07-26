@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { Badge, Button, Nav, Navbar, Offcanvas } from 'react-bootstrap';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../state/AuthContext';
 import { SIDEBAR_GROUPS } from '../constants/navigation';
 import SlotAvailabilityToasts from './SlotAvailabilityToasts';
 import { APP_CONFIG } from '../config/env';
+import LottieLoader from './LottieLoader';
 
 function MenuIcon() {
   return (
@@ -118,9 +120,16 @@ export default function AppShell() {
   const location = useLocation();
   const navItems = SIDEBAR_GROUPS[session?.role || 'USER'];
   const [showMobile, setShowMobile] = useState(false);
+  const [showRouteLoader, setShowRouteLoader] = useState(true);
   const currentPage = pageLabel(location.pathname, navItems);
 
   const closeMobile = () => setShowMobile(false);
+
+  useEffect(() => {
+    setShowRouteLoader(true);
+    const timeoutId = setTimeout(() => setShowRouteLoader(false), 350);
+    return () => clearTimeout(timeoutId);
+  }, [location.pathname]);
 
   return (
     <div className="d-flex min-vh-100">
@@ -161,6 +170,11 @@ export default function AppShell() {
         </Navbar>
 
         <main className="flex-grow-1 p-3 p-md-4">
+          {showRouteLoader ? (
+            <div className="route-loader-overlay" aria-live="polite" aria-busy="true">
+              <LottieLoader size={140} message="Loading..." />
+            </div>
+          ) : null}
           <Outlet />
         </main>
       </div>

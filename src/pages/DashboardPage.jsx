@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Card, Col, Row, Spinner, Table } from 'react-bootstrap';
+import { Badge, Card, Col, Row, Table } from 'react-bootstrap';
 import { api } from '../services/api';
 import { useAuth } from '../state/AuthContext';
 import { formatDurationMinutes } from '../utils/formatters';
+import { useDelayedLoader } from '../hooks/useDelayedLoader';
+import LottieLoader from '../components/LottieLoader';
 
 function BookingRows({ bookings }) {
   if (!bookings.length) {
@@ -44,6 +46,7 @@ function BookingRows({ bookings }) {
 export default function DashboardPage() {
   const { session } = useAuth();
   const [loading, setLoading] = useState(true);
+  const showDashboardLoader = useDelayedLoader(loading, 400);
   const [stats, setStats] = useState({ lots: '—', slots: '—', bookings: '—' });
   const [bookings, setBookings] = useState([]);
 
@@ -104,7 +107,9 @@ export default function DashboardPage() {
           <Card className="h-100 shadow-sm border-0">
             <Card.Body>
               <div className="text-uppercase text-secondary small fw-semibold mb-2">Lots</div>
-              <div className="display-6 fw-semibold mb-0">{loading ? <Spinner animation="border" size="sm" /> : stats.lots}</div>
+              <div className="display-6 fw-semibold mb-0">
+                {showDashboardLoader ? <LottieLoader size={64} message="" /> : stats.lots}
+              </div>
             </Card.Body>
           </Card>
         </Col>
@@ -112,7 +117,9 @@ export default function DashboardPage() {
           <Card className="h-100 shadow-sm border-0">
             <Card.Body>
               <div className="text-uppercase text-secondary small fw-semibold mb-2">Slots</div>
-              <div className="display-6 fw-semibold mb-0">{loading ? <Spinner animation="border" size="sm" /> : stats.slots}</div>
+              <div className="display-6 fw-semibold mb-0">
+                {showDashboardLoader ? <LottieLoader size={64} message="" /> : stats.slots}
+              </div>
             </Card.Body>
           </Card>
         </Col>
@@ -121,7 +128,9 @@ export default function DashboardPage() {
             <Card className="h-100 shadow-sm border-0">
               <Card.Body>
                 <div className="text-uppercase text-secondary small fw-semibold mb-2">My Bookings</div>
-                <div className="display-6 fw-semibold mb-0">{loading ? <Spinner animation="border" size="sm" /> : stats.bookings}</div>
+                <div className="display-6 fw-semibold mb-0">
+                  {showDashboardLoader ? <LottieLoader size={64} message="" /> : stats.bookings}
+                </div>
               </Card.Body>
             </Card>
           </Col>

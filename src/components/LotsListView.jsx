@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { Badge, Button, Card, Form, Modal, Spinner, Table } from 'react-bootstrap';
+import { Badge, Button, Card, Form, Modal, Table } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../state/AuthContext';
 import { statusBadgeVariant } from '../utils/formatters';
 import { useLotsList } from '../hooks/useLotsList';
+import { useDelayedLoader } from '../hooks/useDelayedLoader';
+import LottieLoader from './LottieLoader';
 
 export function LotsListView() {
   const { session } = useAuth();
   const navigate = useNavigate();
   const { lots, loading, refresh } = useLotsList(session?.role);
+  const showLotsLoader = useDelayedLoader(loading, 400);
   const [showLotModal, setShowLotModal] = useState(false);
   const [lotForm, setLotForm] = useState({ name: '', location: '', active: true });
 
@@ -49,8 +52,10 @@ export function LotsListView() {
 
       <Card className="shadow-sm border-0">
         <Card.Body className="p-0">
-          {loading ? (
-            <div className="py-5 text-center"><Spinner animation="border" /></div>
+          {showLotsLoader ? (
+            <div className="py-4">
+              <LottieLoader size={130} message="Fetching parking lots..." />
+            </div>
           ) : lots.length ? (
             <Table responsive hover className="mb-0 align-middle">
               <thead>

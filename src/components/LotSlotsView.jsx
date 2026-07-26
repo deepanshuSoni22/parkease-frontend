@@ -4,7 +4,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../state/AuthContext';
 import { useRazorpayPayment } from '../hooks/useRazorpayPayment';
+import { useDelayedLoader } from '../hooks/useDelayedLoader';
 import DemoTestCards from './DemoTestCards';
+import LottieLoader from './LottieLoader';
 
 export function LotSlotsView() {
   const { lotId } = useParams();
@@ -19,6 +21,7 @@ export function LotSlotsView() {
   const [slotForm, setSlotForm] = useState({ slotNumber: '', slotType: 'STANDARD', available: true, pricePerMinute: '' });
   const [bookingForm, setBookingForm] = useState({ durationPreset: '60', customMinutes: '' });
   const [now, setNow] = useState(Date.now());
+  const showSlotsLoader = useDelayedLoader(loading, 400);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -140,10 +143,10 @@ export function LotSlotsView() {
     refresh();
   };
 
-  if (loading) {
+  if (showSlotsLoader) {
     return (
-      <div className="py-5 text-center">
-        <Spinner animation="border" />
+      <div className="py-4">
+        <LottieLoader size={140} message="Loading lot slots..." />
       </div>
     );
   }

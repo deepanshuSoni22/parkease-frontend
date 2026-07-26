@@ -4,6 +4,36 @@
   place-items: center;
 }
 
+.lottie-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.lottie-loader--fullscreen {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, rgba(13, 110, 253, 0.08), transparent 60%);
+}
+
+.lottie-loader__label {
+  color: var(--bs-secondary-color);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.route-loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(1.5px);
+  pointer-events: none;
+}
+
 .page-title-block {
   padding-bottom: 0.25rem;
 }

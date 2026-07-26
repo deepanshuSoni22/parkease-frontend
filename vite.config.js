@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  assetsInclude: ['**/*.lottie'],
   define: {
     // sockjs-client (CommonJS) references Node's `global`; map it to the
     // standard browser equivalent so Vite's ESM build doesn't crash.
