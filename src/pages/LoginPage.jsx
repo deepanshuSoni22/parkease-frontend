@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Card, Col, Container, Form, Modal, Row, Alert } from 'react-bootstrap';
+import { Alert, Button, Card, Col, Container, Form, Modal, Row, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../state/AuthContext';
 
@@ -11,20 +11,26 @@ export default function LoginPage() {
   const [registerForm, setRegisterForm] = useState({ username: '', password: '', role: 'USER' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const handleLogin = async (event) => {
     event.preventDefault();
+    setIsLoggingIn(true);
     try {
       setError('');
       await login(loginForm.username.trim(), loginForm.password);
       navigate('/', { replace: true });
     } catch (e) {
       setError(e.message || 'Login failed. Check credentials.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleRegister = async (event) => {
     event.preventDefault();
+    setIsRegistering(true);
     try {
       setError('');
       await register(registerForm);
@@ -33,6 +39,8 @@ export default function LoginPage() {
       setLoginForm((current) => ({ ...current, username: registerForm.username }));
     } catch (e) {
       setError(e.message || 'Registration failed.');
+    } finally {
+      setIsRegistering(false);
     }
   };
 
@@ -66,8 +74,15 @@ export default function LoginPage() {
                       placeholder="••••••••"
                     />
                   </Form.Group>
-                  <Button type="submit" className="w-100" variant="primary">
-                    Sign in
+                  <Button type="submit" className="w-100" variant="primary" disabled={isLoggingIn}>
+                    {isLoggingIn ? (
+                      <>
+                        <Spinner animation="border" size="sm" className="me-2" />
+                        Signing in...
+                      </>
+                    ) : (
+                      'Sign in'
+                    )}
                   </Button>
                 </Form>
                 <div className="text-center mt-3">
@@ -119,8 +134,15 @@ export default function LoginPage() {
             <Button variant="outline-secondary" onClick={() => setShowRegister(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary">
-              Register
+            <Button type="submit" variant="primary" disabled={isRegistering}>
+              {isRegistering ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Creating account...
+                </>
+              ) : (
+                'Register'
+              )}
             </Button>
           </Modal.Footer>
         </Form>
